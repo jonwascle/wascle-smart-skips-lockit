@@ -44,7 +44,7 @@ export default function AdminPanel({ operative, onLogout }) {
       sb.from("customers").select("*").order("name"),
       sb.from("skips").select("*, customers(name)").order("name"),
       sb.from("departments").select("*, customers(name)").order("name"),
-      sb.from("operatives").select("*, customers(name)").order("name"),
+      sb.from("operatives").select("*, customers(name), departments(name)").order("name"),
       sb.from("visits").select("*, skips(name), customers(name)").order("created_at", { ascending: false }).limit(100),
     ]);
     setCustomers(c || []);
@@ -111,6 +111,7 @@ export default function AdminPanel({ operative, onLogout }) {
   const [newOpName, setNewOpName] = useState("");
   const [newOpEmail, setNewOpEmail] = useState("");
   const [newOpCustomerId, setNewOpCustomerId] = useState("");
+  const [newOpDepartmentId, setNewOpDepartmentId] = useState("");
   const [creatingOp, setCreatingOp] = useState(false);
   const addOperative = async () => {
     if (!newOpName.trim() || !newOpEmail.trim() || !newOpCustomerId) { flash("Fill in all fields first."); return; }
@@ -120,11 +121,11 @@ export default function AdminPanel({ operative, onLogout }) {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/create-operative`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-        body: JSON.stringify({ name: newOpName.trim(), email: newOpEmail.trim(), customerId: newOpCustomerId }),
+        body: JSON.stringify({ name: newOpName.trim(), email: newOpEmail.trim(), customerId: newOpCustomerId, departmentId: newOpDepartmentId || null }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) { flash(data.error || "Something went wrong."); return; }
-      setNewOpName(""); setNewOpEmail(""); setNewOpCustomerId("");
+      setNewOpName(""); setNewOpEmail(""); setNewOpCustomerId(""); setNewOpDepartmentId("");
       await loadAll();
       flash("Operative created — they'll get a welcome email to set up their password.");
     } finally {
@@ -258,9 +259,13 @@ export default function AdminPanel({ operative, onLogout }) {
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <input value={newOpName} onChange={(e) => setNewOpName(e.target.value)} placeholder="Full name" className="text-sm rounded-md py-2 px-3" style={inputStyle} />
                 <input value={newOpEmail} onChange={(e) => setNewOpEmail(e.target.value)} placeholder="Email" className="text-sm rounded-md py-2 px-3" style={inputStyle} />
-                <select value={newOpCustomerId} onChange={(e) => setNewOpCustomerId(e.target.value)} className="text-sm rounded-md py-2 px-3 col-span-2" style={inputStyle}>
+                <select value={newOpCustomerId} onChange={(e) => { setNewOpCustomerId(e.target.value); setNewOpDepartmentId(""); }} className="text-sm rounded-md py-2 px-3 col-span-2" style={inputStyle}>
                   <option value="">Select customer</option>
                   {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <select value={newOpDepartmentId} onChange={(e) => setNewOpDepartmentId(e.target.value)} disabled={!newOpCustomerId} className="text-sm rounded-md py-2 px-3 col-span-2" style={inputStyle}>
+                  <option value="">Select department (optional)</option>
+                  {departments.filter((d) => d.customer_id === newOpCustomerId).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               </div>
               <button onClick={addOperative} disabled={creatingOp} className="w-full py-2 rounded-md text-sm font-medium flex items-center justify-center gap-1 disabled:opacity-50" style={{ background: AMBER, color: CHARCOAL, fontFamily: bodyFont }}>
@@ -271,7 +276,7 @@ export default function AdminPanel({ operative, onLogout }) {
               <Card key={o.id}>
                 <div className="text-sm font-medium" style={{ fontFamily: bodyFont, color: CHARCOAL }}>{o.name} {o.role === "admin" && <span style={{ color: AMBER }}>(admin)</span>}</div>
                 <div className="text-xs mt-1" style={{ color: STEEL, fontFamily: bodyFont }}>
-                  {o.email} · {o.customers?.name || "No customer"} {o.must_reset_password ? "· hasn't set password yet" : ""}
+                  {o.email} · {o.customers?.name || "No customer"} · {o.departments?.name || "No department"} {o.must_reset_password ? "· hasn't set password yet" : ""}
                 </div>
               </Card>
             ))}
