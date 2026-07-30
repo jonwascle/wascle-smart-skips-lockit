@@ -279,6 +279,7 @@ export default function OperativeApp({ operative, onLogout }) {
       const { data: visits } = await sb.from("visits").select("*, skips(name)").order("created_at", { ascending: false }).limit(20);
       setPastVisits(visits || []);
       setSaved(true);
+      setTimeout(() => { resetVisit(); }, 1800);
     } catch (e) {
       setLocError(e.message);
     }
