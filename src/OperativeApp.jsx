@@ -158,8 +158,6 @@ export default function OperativeApp({ operative, onLogout }) {
   const [currentPos, setCurrentPos] = useState(null);
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState("");
-  const [departments, setDepartments] = useState([]);
-  const [departmentId, setDepartmentId] = useState("");
   const [visitId, setVisitId] = useState(null);
   const [volume, setVolume] = useState(1.5);
   const [showGuide, setShowGuide] = useState(false);
@@ -181,8 +179,6 @@ export default function OperativeApp({ operative, onLogout }) {
     (async () => {
       const { data: skipsData } = await sb.from("skips").select("*").eq("customer_id", operative.customer_id).order("name");
       setSkips(skipsData || []);
-      const { data: depts } = await sb.from("departments").select("*").eq("customer_id", operative.customer_id).order("name");
-      setDepartments(depts || []);
       const { data: visits } = await sb.from("visits").select("*, skips(name)").eq("operative_id", operative.id).order("created_at", { ascending: false }).limit(20);
       setPastVisits(visits || []);
     })();
@@ -225,7 +221,7 @@ export default function OperativeApp({ operative, onLogout }) {
   const canAdvance = () => {
     if (screen === 0) return !!skipLocation;
     if (screen === 1) return inRange;
-    if (screen === 2) return !!departmentId;
+    if (screen === 2) return true;
     if (screen === 3) return !!photoWaste;
     if (screen === 4) return codeConfirmed;
     if (screen === 5) return !!photoOpened;
@@ -259,13 +255,12 @@ export default function OperativeApp({ operative, onLogout }) {
       }
     }
     if (screen === 2 && !visitId) {
-      const dept = departments.find((d) => d.id === departmentId);
       const { data, error } = await sb.from("visits").insert({
         skip_id: skipId,
         operative_id: operative.id,
         customer_id: operative.customer_id,
         employee_name: operative.name,
-        department: dept ? dept.name : null,
+        department: operative.departments?.name || null,
         distance_m: distance ? Math.round(distance) : null,
       }).select().single();
       if (error) {
@@ -293,7 +288,6 @@ export default function OperativeApp({ operative, onLogout }) {
     setScreen(0);
     setSkipLocation(null);
     setSkipId(null);
-    setDepartmentId("");
     setVisitId(null);
     setVolume(1.5);
     setPhotoWaste(null);
@@ -458,20 +452,6 @@ export default function OperativeApp({ operative, onLogout }) {
                     <h2 className="text-2xl leading-tight" style={{ fontFamily: displayFont, fontWeight: 600, color: CHARCOAL }}>
                       What are you tipping, {operative.name.split(" ")[0]}?
                     </h2>
-                    <Docket>
-                      <div className="text-xs mb-2" style={{ color: STEEL, fontFamily: bodyFont }}>Your department</div>
-                      <select
-                        value={departmentId}
-                        onChange={(e) => setDepartmentId(e.target.value)}
-                        className="w-full text-sm rounded-md py-2 px-2"
-                        style={{ fontFamily: bodyFont, color: CHARCOAL, background: PAPER, border: `1px solid ${LINE}` }}
-                      >
-                        <option value="">Select department</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
-                        ))}
-                      </select>
-                    </Docket>
                     <Docket>
                       <div className="text-xs mb-2" style={{ color: STEEL, fontFamily: bodyFont }}>
                         Estimated volume . doesn't need to be exact
@@ -646,7 +626,7 @@ export default function OperativeApp({ operative, onLogout }) {
                       <div className="grid grid-cols-2 gap-y-2 text-sm" style={{ fontFamily: bodyFont, color: CHARCOAL }}>
                         <span style={{ color: STEEL }}>Smart skip</span><span>{skipLocation ? skipLocation.name : "n/a"}</span>
                         <span style={{ color: STEEL }}>Employee</span><span>{operative.name}</span>
-                        <span style={{ color: STEEL }}>Department</span><span>{departments.find((d) => d.id === departmentId)?.name || "n/a"}</span>
+                        <span style={{ color: STEEL }}>Department</span><span>{operative.departments?.name || "n/a"}</span>
                         <span style={{ color: STEEL }}>Distance at start</span><span>{distance !== null ? `${Math.round(distance)} m` : "n/a"}</span>
                         <span style={{ color: STEEL }}>Est. volume</span><span>{volume.toFixed(1)} yd3</span>
                         <span style={{ color: STEEL }}>Access code</span><span>{code || "n/a"}</span>
