@@ -153,8 +153,10 @@ function PhotoCapture({ label, colorAccent, image, onCapture, note, timestamp })
 export default function OperativeApp({ operative, onLogout }) {
   const [screen, setScreen] = useState(0);
   const [skips, setSkips] = useState([]);
+  const [links, setLinks] = useState([]);
   const [skipLocation, setSkipLocation] = useState(null);
   const [skipId, setSkipId] = useState(null);
+  const [skipHAId, setSkipHAId] = useState(null);
   const [currentPos, setCurrentPos] = useState(null);
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState("");
@@ -177,8 +179,14 @@ export default function OperativeApp({ operative, onLogout }) {
 
   useEffect(() => {
     (async () => {
-      const { data: skipsData } = await sb.from("skips").select("*").eq("customer_id", operative.customer_id).order("name");
-      setSkips(skipsData || []);
+      const { data: linksData } = await sb.from("operative_housing_associations")
+        .select("*, housing_associations(name), departments(name)").eq("operative_id", operative.id);
+      setLinks(linksData || []);
+      const haIds = (linksData || []).map((l) => l.housing_association_id);
+      if (haIds.length > 0) {
+        const { data: skipsData } = await sb.from("skips").select("*").in("housing_association_id", haIds).order("name");
+        setSkips(skipsData || []);
+      }
       const { data: visits } = await sb.from("visits").select("*, skips(name)").eq("operative_id", operative.id).order("created_at", { ascending: false }).limit(20);
       setPastVisits(visits || []);
     })();
@@ -187,6 +195,7 @@ export default function OperativeApp({ operative, onLogout }) {
   const chooseSkip = (skip) => {
     setSkipLocation({ lat: skip.lat, lng: skip.lng, name: skip.name });
     setSkipId(skip.id);
+    setSkipHAId(skip.housing_association_id);
   };
 
   const locate = async () => {
@@ -255,12 +264,13 @@ export default function OperativeApp({ operative, onLogout }) {
       }
     }
     if (screen === 2 && !visitId) {
+      const matchingLink = links.find((l) => l.housing_association_id === skipHAId);
       const { data, error } = await sb.from("visits").insert({
         skip_id: skipId,
         operative_id: operative.id,
-        customer_id: operative.customer_id,
+        housing_association_id: skipHAId,
         employee_name: operative.name,
-        department: operative.departments?.name || null,
+        department: matchingLink?.departments?.name || null,
         distance_m: distance ? Math.round(distance) : null,
       }).select().single();
       if (error) {
@@ -289,6 +299,7 @@ export default function OperativeApp({ operative, onLogout }) {
     setScreen(0);
     setSkipLocation(null);
     setSkipId(null);
+    setSkipHAId(null);
     setVisitId(null);
     setVolume(1.5);
     setPhotoWaste(null);
@@ -627,7 +638,7 @@ export default function OperativeApp({ operative, onLogout }) {
                       <div className="grid grid-cols-2 gap-y-2 text-sm" style={{ fontFamily: bodyFont, color: CHARCOAL }}>
                         <span style={{ color: STEEL }}>Smart skip</span><span>{skipLocation ? skipLocation.name : "n/a"}</span>
                         <span style={{ color: STEEL }}>Employee</span><span>{operative.name}</span>
-                        <span style={{ color: STEEL }}>Department</span><span>{operative.departments?.name || "n/a"}</span>
+                        <span style={{ color: STEEL }}>Department</span><span>{links.find((l) => l.housing_association_id === skipHAId)?.departments?.name || "n/a"}</span>
                         <span style={{ color: STEEL }}>Distance at start</span><span>{distance !== null ? `${Math.round(distance)} m` : "n/a"}</span>
                         <span style={{ color: STEEL }}>Est. volume</span><span>{volume.toFixed(1)} yd3</span>
                         <span style={{ color: STEEL }}>Access code</span><span>{code || "n/a"}</span>
