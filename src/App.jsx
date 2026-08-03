@@ -10,7 +10,7 @@ export default function App() {
   const [operative, setOperative] = useState(null);
 
   const loadOperative = async (authUser) => {
-    const { data } = await sb.from("operatives").select("*, departments(name)").eq("id", authUser.id).maybeSingle();
+    const { data } = await sb.from("operatives").select("*").eq("id", authUser.id).maybeSingle();
     setOperative(data || null);
     setUser(authUser);
   };
